@@ -160,8 +160,8 @@ const DISPLAY_SHADER = `
     float interferenceStrength = fresnel * 0.5 + d * 0.1;
     interferenceStrength = clamp(interferenceStrength, 0.0, 1.0);
 
-    // Mix with a lower factor to make it more subtle
-    vec3 fluidColor = mix(absorbed, rainbow, interferenceStrength * 0.5);
+    // Mix with a higher factor to make colors more visible
+    vec3 fluidColor = mix(absorbed, rainbow, interferenceStrength * 0.75);
     
     gl_FragColor = vec4(mix(bg, fluidColor, shape), 1.0);
   }
