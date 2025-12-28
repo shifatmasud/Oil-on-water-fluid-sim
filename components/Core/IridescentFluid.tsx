@@ -1,4 +1,5 @@
 
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -123,44 +124,39 @@ const DISPLAY_SHADER = `
   }
 
   void main() {
-    // 1. Refraction: Distort UVs based on velocity
+    // 1. Velocity & Density
     vec2 velocity = texture2D(uVelocity, vUv).xy;
-    vec2 distortedUv = vUv - velocity * 0.003; // Small distortion factor
-    
+    vec2 distortedUv = vUv - velocity * 0.003; // Refraction effect
     float d = texture2D(uDensity, distortedUv).x;
     
-    // Smoothstep threshold to avoid hard cutoffs but keep background clean
-    float shape = smoothstep(0.0, 0.02, d); // Slightly sharper falloff
+    // 2. Shape (based on density to keep form)
+    float shape = smoothstep(0.0, 0.02, d);
     
     if (shape < 0.001) {
         gl_FragColor = vec4(1.0); // White background
         return;
     }
 
-    // 2. Calculate Normal from undistorted UVs for stability
+    // 3. Normal & Fresnel (based on density for 3D effect)
     float dx = texture2D(uDensity, vUv + vec2(texelSize.x, 0.0)).x - texture2D(uDensity, vUv - vec2(texelSize.x, 0.0)).x;
     float dy = texture2D(uDensity, vUv + vec2(0.0, texelSize.y)).x - texture2D(uDensity, vUv - vec2(0.0, texelSize.y)).x;
     vec3 normal = normalize(vec3(dx * 8.0, dy * 8.0, 1.0));
-
-    // 3. Fresnel Edge Detection
     float fresnel = 1.0 - max(0.0, dot(normal, vec3(0.0, 0.0, 1.0)));
-    fresnel = pow(fresnel, 3.0); // More concentrated on the edges
+    fresnel = pow(fresnel, 3.0);
 
-    // 4. Iridescence (Oil Film Color)
-    // Reduced ring pattern multiplier from 4.0 to 1.5
-    vec3 rainbow = palette(d * 1.5 + fresnel * 0.5);
+    // 4. Iridescence (Color based on VELOCITY)
+    float speed = length(velocity);
+    // Drastically reduced speed multiplier to soften color rings.
+    vec3 rainbow = palette(speed * 4.0 + fresnel * 0.5);
 
     // 5. Composition
     vec3 bg = vec3(1.0);
+    vec3 absorbed = bg; // No absorption for a clean look
 
-    // Removed absorption to eliminate the shadow effect
-    vec3 absorbed = bg;
-
-    // Subtler interference strength
-    float interferenceStrength = fresnel * 0.5 + d * 0.1;
+    // Drastically reduced speed multiplier for interference strength to soften rings.
+    float interferenceStrength = fresnel * 0.5 + speed * 0.4; 
     interferenceStrength = clamp(interferenceStrength, 0.0, 1.0);
 
-    // Mix with a higher factor to make colors more visible
     vec3 fluidColor = mix(absorbed, rainbow, interferenceStrength * 0.75);
     
     gl_FragColor = vec4(mix(bg, fluidColor, shape), 1.0);

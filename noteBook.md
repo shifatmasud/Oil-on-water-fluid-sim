@@ -13,6 +13,8 @@ A log of all tasks, ideas, and progress for this project.
 
 ## Done
 
+-   **[2024-05-21 13:50]**: Further reduced fluid simulation intensity for a much calmer and more stable experience.
+-   **[2024-05-21 13:45]**: Adjusted fluid simulation parameters to reduce intensity and increase stability for a calmer default experience.
 -   **[2024-05-21 13:30]**: Refactored Meta Prototype to control an interactive `IridescentFluid` simulation instead of a button component.
 -   **[2024-05-21 13:15]**: Added a toggleable measurement overlay to the Stage, showing real-time dimensions for the button component.
 -   **[2024--05-21 13:00]**: Completed extensive refactor into granular components (new Core inputs, Package panels for each window, Section for Stage).

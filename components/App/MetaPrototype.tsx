@@ -24,11 +24,11 @@ const MetaPrototype = () => {
   
   // -- App State --
   const [fluidProps, setFluidProps] = useState<FluidProps>({
-    velocityDissipation: 0.995,
-    densityDissipation: 0.992,
+    velocityDissipation: 0.985,
+    densityDissipation: 0.99,
     pressureIterations: 20,
-    splatRadius: 0.003,
-    splatStrength: 25.0,
+    splatRadius: 0.004,
+    splatStrength: 3.0,
   });
   
   // Simulation control state

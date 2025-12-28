@@ -33,7 +33,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing['Space.L'] }}>
       
-      <RangeSlider {...createFloatSliderProps('velocityDissipation', 0.99, 0.9999)} />
+      <RangeSlider {...createFloatSliderProps('velocityDissipation', 0.98, 0.9999)} />
       <RangeSlider {...createFloatSliderProps('densityDissipation', 0.98, 0.9999)} />
 
       <div style={{ borderTop: `1px solid ${theme.Color.Base.Surface[3]}` }} />
@@ -54,8 +54,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         label="Splat Strength"
         motionValue={{ get: () => fluidProps.splatStrength, set: () => {}, onChange: () => {} } as any}
         onCommit={(value) => onPropChange('splatStrength', value)}
-        min={5}
-        max={100}
+        min={1}
+        max={50}
       />
       
       <div style={{ borderTop: `1px solid ${theme.Color.Base.Surface[3]}` }} />
