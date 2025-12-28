@@ -1,5 +1,3 @@
-
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -11,6 +9,7 @@ import { FluidProps } from '../../types/index.tsx';
 interface IridescentFluidProps {
     config: FluidProps;
     clearTrigger: number;
+    imageUrl?: string;
 }
 
 // --- SHADER CHUNKS ---
@@ -116,56 +115,71 @@ const DISPLAY_SHADER = `
   varying vec2 vUv;
   uniform sampler2D uDensity;
   uniform sampler2D uVelocity;
+  uniform sampler2D uImage;
   uniform vec2 texelSize;
+  uniform float uAspectRatio;
 
-  // More subtle, pastel-like palette
   vec3 palette( in float t ) {
       return vec3(0.8) + vec3(0.2) * cos( 6.28318 * (vec3(1.0) * t + vec3(0.00, 0.33, 0.67)) );
   }
 
   void main() {
-    // 1. Velocity & Density
+    // 1. Data Sampling
     vec2 velocity = texture2D(uVelocity, vUv).xy;
-    vec2 distortedUv = vUv - velocity * 0.003; // Refraction effect
-    float d = texture2D(uDensity, distortedUv).x;
+    float d = texture2D(uDensity, vUv).x;
+    float speed = length(velocity);
     
-    // 2. Shape (based on density to keep form)
-    float shape = smoothstep(0.0, 0.02, d);
+    // 2. Localized Displacement Mask
+    // Displacement ONLY within the disturbance splat area
+    float displacementMask = smoothstep(0.0, 0.05, d);
+    vec2 refractedUv = vUv - (velocity * 0.06 * displacementMask);
     
-    if (shape < 0.001) {
-        gl_FragColor = vec4(1.0); // White background
-        return;
+    // 3. Centered Image Rendering
+    // Scale image down to a small size in center center
+    float imgSize = 0.35; 
+    vec2 centeredUv = (refractedUv - 0.5) / imgSize + 0.5;
+    
+    bool inBounds = centeredUv.x >= 0.0 && centeredUv.x <= 1.0 && centeredUv.y >= 0.0 && centeredUv.y <= 1.0;
+    
+    vec3 baseColor;
+    if (inBounds) {
+        // Blur logic: Blur what's behind the disturbance
+        float blurScale = d * 0.025; 
+        
+        vec3 s0 = texture2D(uImage, centeredUv).rgb;
+        vec3 s1 = texture2D(uImage, centeredUv + vec2(blurScale, 0.0)).rgb;
+        vec3 s2 = texture2D(uImage, centeredUv - vec2(blurScale, 0.0)).rgb;
+        vec3 s3 = texture2D(uImage, centeredUv + vec2(0.0, blurScale)).rgb;
+        vec3 s4 = texture2D(uImage, centeredUv - vec2(0.0, blurScale)).rgb;
+        
+        baseColor = (s0 + s1 + s2 + s3 + s4) * 0.2;
+    } else {
+        baseColor = vec3(1.0); // Pure White Plane
     }
 
-    // 3. Normal & Fresnel (based on density for 3D effect)
-    float dx = texture2D(uDensity, vUv + vec2(texelSize.x, 0.0)).x - texture2D(uDensity, vUv - vec2(texelSize.x, 0.0)).x;
-    float dy = texture2D(uDensity, vUv + vec2(0.0, texelSize.y)).x - texture2D(uDensity, vUv - vec2(0.0, texelSize.y)).x;
-    vec3 normal = normalize(vec3(dx * 8.0, dy * 8.0, 1.0));
-    float fresnel = 1.0 - max(0.0, dot(normal, vec3(0.0, 0.0, 1.0)));
-    fresnel = pow(fresnel, 3.0);
+    // 4. Fluid Visuals (Oil iridescence overlay)
+    float shape = smoothstep(0.0, 0.02, d);
+    if (shape > 0.001) {
+        float dx = texture2D(uDensity, vUv + vec2(texelSize.x, 0.0)).x - texture2D(uDensity, vUv - vec2(texelSize.x, 0.0)).x;
+        float dy = texture2D(uDensity, vUv + vec2(0.0, texelSize.y)).x - texture2D(uDensity, vUv - vec2(0.0, texelSize.y)).x;
+        vec3 normal = normalize(vec3(dx * 8.0, dy * 8.0, 1.0));
+        float fresnel = pow(1.0 - max(0.0, dot(normal, vec3(0.0, 0.0, 1.0))), 3.0);
 
-    // 4. Iridescence (Color based on VELOCITY)
-    float speed = length(velocity);
-    // Drastically reduced speed multiplier to soften color rings.
-    vec3 rainbow = palette(speed * 4.0 + fresnel * 0.5);
+        vec3 rainbow = palette(speed * 3.5 + fresnel * 0.4);
+        float interferenceStrength = clamp(fresnel * 0.4 + speed * 0.5, 0.0, 1.0);
 
-    // 5. Composition
-    vec3 bg = vec3(1.0);
-    vec3 absorbed = bg; // No absorption for a clean look
-
-    // Drastically reduced speed multiplier for interference strength to soften rings.
-    float interferenceStrength = fresnel * 0.5 + speed * 0.4; 
-    interferenceStrength = clamp(interferenceStrength, 0.0, 1.0);
-
-    vec3 fluidColor = mix(absorbed, rainbow, interferenceStrength * 0.75);
+        // Blend the iridescent oil effect over the (potentially blurred/displaced) background
+        vec3 fluidColor = mix(baseColor, rainbow, interferenceStrength * 0.65);
+        baseColor = mix(baseColor, fluidColor, shape);
+    }
     
-    gl_FragColor = vec4(mix(bg, fluidColor, shape), 1.0);
+    gl_FragColor = vec4(baseColor, 1.0);
   }
 `;
 
 // --- COMPONENT ---
 
-const IridescentFluid: React.FC<IridescentFluidProps> = ({ config, clearTrigger }) => {
+const IridescentFluid: React.FC<IridescentFluidProps> = ({ config, clearTrigger, imageUrl }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const simRefs = useRef<any>({});
@@ -229,9 +243,11 @@ const IridescentFluid: React.FC<IridescentFluidProps> = ({ config, clearTrigger 
         uniforms: {
             uVelocity: { value: null }, uSource: { value: null }, uTarget: { value: null },
             uPressure: { value: null }, uDivergence: { value: null }, uDensity: { value: null },
+            uImage: { value: null },
             texelSize: { value: new THREE.Vector2() }, dt: { value: 0.016 }, dissipation: { value: 0.98 },
             aspectRatio: { value: 1.0 }, color: { value: new THREE.Vector3() },
             point: { value: new THREE.Vector2() }, radius: { value: 0.0 },
+            uAspectRatio: { value: 1.0 }
         },
         vertexShader: BASE_VERTEX, fragmentShader: fs,
         depthWrite: false, depthTest: false, blending: THREE.NoBlending
@@ -243,6 +259,20 @@ const IridescentFluid: React.FC<IridescentFluidProps> = ({ config, clearTrigger 
     const pressureMat = createShaderMaterial(PRESSURE_SHADER);
     const gradientSubtractMat = createShaderMaterial(GRADIENT_SUBTRACT_SHADER);
     const displayMat = createShaderMaterial(DISPLAY_SHADER);
+
+    const dummyTex = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1, THREE.RGBAFormat);
+    dummyTex.needsUpdate = true;
+    displayMat.uniforms.uImage.value = dummyTex;
+
+    if (imageUrl) {
+        new THREE.TextureLoader().load(imageUrl, (tex) => {
+            tex.minFilter = THREE.LinearFilter;
+            tex.magFilter = THREE.LinearFilter;
+            tex.wrapS = THREE.ClampToEdgeWrapping;
+            tex.wrapT = THREE.ClampToEdgeWrapping;
+            displayMat.uniforms.uImage.value = tex;
+        });
+    }
 
     const quad = new THREE.Mesh(plane, displayMat);
     scene.add(quad);
@@ -349,7 +379,10 @@ const IridescentFluid: React.FC<IridescentFluidProps> = ({ config, clearTrigger 
 
     const handleResize = () => {
         if (!containerRef.current || !canvasRef.current) return;
-        renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight, false);
+        const w = containerRef.current.clientWidth;
+        const h = containerRef.current.clientHeight;
+        renderer.setSize(w, h, false);
+        displayMat.uniforms.uAspectRatio.value = w / h;
     };
 
     handleResize();
@@ -360,12 +393,11 @@ const IridescentFluid: React.FC<IridescentFluidProps> = ({ config, clearTrigger 
         window.removeEventListener('mousemove', onMouseMove);
         window.removeEventListener('resize', handleResize);
         if (canvasRef.current) {
-            // eslint-disable-next-line react-hooks/exhaustive-deps
             canvasRef.current.removeEventListener('touchmove', onTouchMove);
         }
         renderer.dispose();
     };
-  }, []);
+  }, [imageUrl]);
 
   return (
     <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }}>

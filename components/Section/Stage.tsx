@@ -1,4 +1,3 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -16,6 +15,9 @@ interface StageProps {
 const Stage: React.FC<StageProps> = ({ fluidProps, clearTrigger }) => {
   const { theme } = useTheme();
 
+  // A premium abstract image to be displaced by the fluid
+  const imageUrl = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000&auto=format&fit=crop";
+
   return (
     <div style={{ 
         position: 'relative', 
@@ -25,7 +27,11 @@ const Stage: React.FC<StageProps> = ({ fluidProps, clearTrigger }) => {
         backgroundColor: theme.Color.Base.Surface[1],
         zIndex: 0
     }}>
-        <IridescentFluid config={fluidProps} clearTrigger={clearTrigger} />
+        <IridescentFluid 
+          config={fluidProps} 
+          clearTrigger={clearTrigger} 
+          imageUrl={imageUrl} 
+        />
     </div>
   );
 };
