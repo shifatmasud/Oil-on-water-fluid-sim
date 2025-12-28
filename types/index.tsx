@@ -3,8 +3,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ButtonVariant, ButtonSize } from '../components/Core/Button.tsx';
-
 // --- Window Management ---
 export type WindowId = 'control' | 'code' | 'console';
 
@@ -24,18 +22,11 @@ export interface LogEntry {
   message: string;
 }
 
-// --- Button Props for Meta Prototype ---
-export interface MetaButtonProps {
-    label: string;
-    variant: ButtonVariant;
-    size: ButtonSize;
-    icon: string;
-    customFill: string;
-    customColor: string;
-    customRadius: string;
-    // States
-    disabled: boolean;
-    forcedHover: boolean;
-    forcedFocus: boolean;
-    forcedActive: boolean;
+// --- Fluid Simulation Props for Meta Prototype ---
+export interface FluidProps {
+    velocityDissipation: number;
+    densityDissipation: number;
+    pressureIterations: number;
+    splatRadius: number;
+    splatStrength: number;
 }

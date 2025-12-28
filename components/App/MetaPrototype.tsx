@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import React, { useState, useEffect } from 'react';
-import { useMotionValue, useTransform, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import { useTheme } from '../../Theme.tsx';
 import ThemeToggleButton from '../Core/ThemeToggleButton.tsx';
 import FloatingWindow from '../Package/FloatingWindow.tsx';
@@ -13,8 +13,7 @@ import ControlPanel from '../Package/ControlPanel.tsx';
 import CodePanel from '../Package/CodePanel.tsx';
 import ConsolePanel from '../Package/ConsolePanel.tsx';
 import UndoRedo from '../Package/UndoRedo.tsx';
-import Confetti from '../Core/Confetti.tsx';
-import { WindowId, WindowState, LogEntry, MetaButtonProps } from '../../types/index.tsx';
+import { WindowId, WindowState, LogEntry, FluidProps } from '../../types/index.tsx';
 
 /**
  * 🏎️ Meta Prototype App
@@ -24,63 +23,28 @@ const MetaPrototype = () => {
   const { theme } = useTheme();
   
   // -- App State --
-  const [btnProps, setBtnProps] = useState<MetaButtonProps>({
-    label: 'Do Magic',
-    variant: 'primary',
-    size: 'M',
-    icon: 'ph-sparkle',
-    customFill: '',
-    customColor: '',
-    customRadius: '56px',
-    disabled: false,
-    forcedHover: false,
-    forcedFocus: false,
-    forcedActive: false,
+  const [fluidProps, setFluidProps] = useState<FluidProps>({
+    velocityDissipation: 0.995,
+    densityDissipation: 0.992,
+    pressureIterations: 20,
+    splatRadius: 0.003,
+    splatStrength: 25.0,
   });
   
-  // -- View / Inspection State --
-  const [showMeasurements, setShowMeasurements] = useState(false);
-  const [showTokens, setShowTokens] = useState(false);
-  
-  // 3D Layer View State
-  const [view3D, setView3D] = useState(false);
-  const layerSpacing = useMotionValue(0);
-  const viewRotateX = useMotionValue(55);
-  const viewRotateZ = useMotionValue(45);
-
-  // -- Confetti State --
-  const [confettiTrigger, setConfettiTrigger] = useState(0);
-
-  // -- Real-time MotionValue for live UI updates --
-  const radiusMotionValue = useMotionValue(parseInt(btnProps.customRadius) || 0);
-  const radiusStringMotionValue = useTransform(radiusMotionValue, (v) => `${Math.round(v)}px`);
-
-  // Sync MotionValue when state is changed by other means (e.g., undo/redo)
-  useEffect(() => {
-    radiusMotionValue.set(parseInt(btnProps.customRadius) || 0);
-  }, [btnProps.customRadius, radiusMotionValue]);
-  
-  // Auto-expand layers when entering 3D mode
-  useEffect(() => {
-    if (view3D) {
-      layerSpacing.set(40);
-    } else {
-      layerSpacing.set(0);
-    }
-  }, [view3D, layerSpacing]);
-
+  // Simulation control state
+  const [clearTrigger, setClearTrigger] = useState(0);
 
   const [logs, setLogs] = useState<LogEntry[]>([]);
   
   // -- History State --
-  const [history, setHistory] = useState<MetaButtonProps[]>([]);
-  const [future, setFuture] = useState<MetaButtonProps[]>([]);
+  const [history, setHistory] = useState<FluidProps[]>([]);
+  const [future, setFuture] = useState<FluidProps[]>([]);
 
   // --- Window Management ---
   const WINDOW_WIDTH = 400;
-  const CONTROL_PANEL_HEIGHT = 640; // Increased height for new 3D controls
+  const CONTROL_PANEL_HEIGHT = 480;
   const CODE_PANEL_HEIGHT = 408;
-  const CONSOLE_PANEL_HEIGHT = 200; // Increased slightly for better visibility
+  const CONSOLE_PANEL_HEIGHT = 200;
 
   const [windows, setWindows] = useState<Record<WindowId, WindowState>>({
     control: { id: 'control', title: 'Control', isOpen: false, zIndex: 1, x: -WINDOW_WIDTH / 2, y: -CONTROL_PANEL_HEIGHT / 2 },
@@ -94,9 +58,9 @@ const MetaPrototype = () => {
   
   useEffect(() => {
     if (!isCodeFocused) {
-      setCodeText(JSON.stringify(btnProps, null, 2));
+      setCodeText(JSON.stringify(fluidProps, null, 2));
     }
-  }, [btnProps, isCodeFocused]);
+  }, [fluidProps, isCodeFocused]);
 
   // -- Actions --
 
@@ -106,30 +70,27 @@ const MetaPrototype = () => {
       timestamp: new Date().toLocaleTimeString(),
       message: msg,
     };
-    // Append new logs to the end (Standard Console behavior)
-    // Keep only the last 50 logs
     setLogs(prev => [...prev, entry].slice(-50));
   };
   
-  // Initial Log
   useEffect(() => {
-      logEvent('System Ready. Meta Prototype initialized.');
+      logEvent('System Ready. Fluid simulation initialized.');
   }, []);
 
-  const updateBtnProps = (newProps: MetaButtonProps, saveHistory: boolean = true) => {
+  const updateFluidProps = (newProps: FluidProps, saveHistory: boolean = true) => {
     if (saveHistory) {
-      setHistory(prev => [...prev, btnProps]);
+      setHistory(prev => [...prev, fluidProps]);
       setFuture([]);
     }
-    setBtnProps(newProps);
+    setFluidProps(newProps);
   };
 
   const handleUndo = () => {
     if (history.length === 0) return;
     const previous = history[history.length - 1];
     const newHistory = history.slice(0, -1);
-    setFuture(prev => [btnProps, ...prev]);
-    setBtnProps(previous);
+    setFuture(prev => [fluidProps, ...prev]);
+    setFluidProps(previous);
     setHistory(newHistory);
     logEvent('Undo performed');
   };
@@ -138,8 +99,8 @@ const MetaPrototype = () => {
     if (future.length === 0) return;
     const next = future[0];
     const newFuture = future.slice(1);
-    setHistory(prev => [...prev, btnProps]);
-    setBtnProps(next);
+    setHistory(prev => [...prev, fluidProps]);
+    setFluidProps(next);
     setFuture(newFuture);
     logEvent('Redo performed');
   };
@@ -165,51 +126,30 @@ const MetaPrototype = () => {
   };
 
   const handleCopyCode = () => {
-    navigator.clipboard.writeText(JSON.stringify(btnProps, null, 2));
+    navigator.clipboard.writeText(JSON.stringify(fluidProps, null, 2));
     logEvent('JSON copied to clipboard');
   };
   
-  const handlePropChange = (keyOrObj: string | Partial<MetaButtonProps>, value?: any) => {
-    if (typeof keyOrObj === 'string') {
-        updateBtnProps({ ...btnProps, [keyOrObj]: value });
-        logEvent(`Prop updated: ${keyOrObj} = ${value}`);
-    } else {
-        updateBtnProps({ ...btnProps, ...keyOrObj });
-        logEvent(`State updated: ${Object.keys(keyOrObj).join(', ')}`);
-    }
+  const handlePropChange = (key: keyof FluidProps, value: any) => {
+      updateFluidProps({ ...fluidProps, [key]: value });
+      logEvent(`Prop updated: ${key} = ${value}`);
   };
-
-  const handleRadiusCommit = (value: number) => {
-    handlePropChange('customRadius', `${value}px`);
-  }
 
   const handleCodeChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newVal = e.target.value;
     setCodeText(newVal);
     try {
       const parsed = JSON.parse(newVal);
-      updateBtnProps(parsed, true);
+      updateFluidProps(parsed, true);
     } catch (err) {
       // Invalid JSON, just update text
     }
   };
 
-  const handleToggleMeasurements = () => {
-    setShowMeasurements(prev => !prev);
-    if (showTokens) setShowTokens(false); // Exclusive toggle
-    logEvent(`Measurements toggled: ${!showMeasurements ? 'On' : 'Off'}`);
-  };
-
-  const handleToggleTokens = () => {
-    setShowTokens(prev => !prev);
-    if (showMeasurements) setShowMeasurements(false); // Exclusive toggle
-    logEvent(`Tokens toggled: ${!showTokens ? 'On' : 'Off'}`);
-  };
-  
-  const handleStageButtonClick = () => {
-    logEvent('Button Clicked! (Triggered Action)');
-    setConfettiTrigger(prev => prev + 1);
-  };
+  const handleClear = () => {
+    setClearTrigger(t => t + 1);
+    logEvent('Simulation cleared.');
+  }
 
   return (
     <div style={{
@@ -223,18 +163,8 @@ const MetaPrototype = () => {
       justifyContent: 'center',
     }}>
       <ThemeToggleButton />
-      <Confetti trigger={confettiTrigger} />
-
-      <Stage
-        btnProps={{...btnProps, customRadius: radiusStringMotionValue}}
-        onButtonClick={handleStageButtonClick}
-        showMeasurements={showMeasurements}
-        showTokens={showTokens}
-        view3D={view3D}
-        viewRotateX={viewRotateX}
-        viewRotateZ={viewRotateZ}
-        layerSpacing={layerSpacing}
-      />
+      
+      <Stage fluidProps={fluidProps} clearTrigger={clearTrigger} />
 
       {/* --- WINDOWS --- */}
       <AnimatePresence>
@@ -247,20 +177,9 @@ const MetaPrototype = () => {
             footer={<UndoRedo onUndo={handleUndo} onRedo={handleRedo} canUndo={history.length > 0} canRedo={future.length > 0} />}
           >
             <ControlPanel
-                btnProps={btnProps}
+                fluidProps={fluidProps}
                 onPropChange={handlePropChange}
-                radiusMotionValue={radiusMotionValue}
-                onRadiusCommit={handleRadiusCommit}
-                showMeasurements={showMeasurements}
-                onToggleMeasurements={handleToggleMeasurements}
-                showTokens={showTokens}
-                onToggleTokens={handleToggleTokens}
-                // 3D Props
-                view3D={view3D}
-                onToggleView3D={() => setView3D(!view3D)}
-                layerSpacing={layerSpacing}
-                viewRotateX={viewRotateX}
-                viewRotateZ={viewRotateZ}
+                onClear={handleClear}
             />
           </FloatingWindow>
         )}
@@ -278,7 +197,7 @@ const MetaPrototype = () => {
               onCopyCode={handleCopyCode}
               onFocus={() => setIsCodeFocused(true)}
               onBlur={() => setIsCodeFocused(false)}
-              btnProps={btnProps}
+              fluidProps={fluidProps}
             />
           </FloatingWindow>
         )}

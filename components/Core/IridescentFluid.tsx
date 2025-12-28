@@ -5,9 +5,14 @@
  */
 import React, { useRef, useEffect } from 'react';
 import * as THREE from 'three';
+import { FluidProps } from '../../types/index.tsx';
+
+interface IridescentFluidProps {
+    config: FluidProps;
+    clearTrigger: number;
+}
 
 // --- SHADER CHUNKS ---
-
 const BASE_VERTEX = `
   varying vec2 vUv;
   void main() {
@@ -112,66 +117,86 @@ const DISPLAY_SHADER = `
   uniform sampler2D uVelocity;
   uniform vec2 texelSize;
 
-  // Clean Rainbow Palette (Cyan, Magenta, Yellow focused)
+  // More subtle, pastel-like palette
   vec3 palette( in float t ) {
-      return vec3(0.6) + vec3(0.4) * cos( 6.28318 * (vec3(1.0) * t + vec3(0.00, 0.33, 0.67)) );
+      return vec3(0.8) + vec3(0.2) * cos( 6.28318 * (vec3(1.0) * t + vec3(0.00, 0.33, 0.67)) );
   }
 
   void main() {
-    float d = texture2D(uDensity, vUv).x;
+    // 1. Refraction: Distort UVs based on velocity
+    vec2 velocity = texture2D(uVelocity, vUv).xy;
+    vec2 distortedUv = vUv - velocity * 0.003; // Small distortion factor
+    
+    float d = texture2D(uDensity, distortedUv).x;
     
     // Smoothstep threshold to avoid hard cutoffs but keep background clean
-    float shape = smoothstep(0.0, 0.05, d);
+    float shape = smoothstep(0.0, 0.02, d); // Slightly sharper falloff
     
     if (shape < 0.001) {
-        gl_FragColor = vec4(1.0);
+        gl_FragColor = vec4(1.0); // White background
         return;
     }
 
-    // 1. Calculate Normal
-    // Higher multiplier for steeper "virtual" waves
+    // 2. Calculate Normal from undistorted UVs for stability
     float dx = texture2D(uDensity, vUv + vec2(texelSize.x, 0.0)).x - texture2D(uDensity, vUv - vec2(texelSize.x, 0.0)).x;
     float dy = texture2D(uDensity, vUv + vec2(0.0, texelSize.y)).x - texture2D(uDensity, vUv - vec2(0.0, texelSize.y)).x;
     vec3 normal = normalize(vec3(dx * 8.0, dy * 8.0, 1.0));
 
-    // 2. Fresnel Edge Detection
+    // 3. Fresnel Edge Detection
     float fresnel = 1.0 - max(0.0, dot(normal, vec3(0.0, 0.0, 1.0)));
-    fresnel = pow(fresnel, 2.0);
+    fresnel = pow(fresnel, 3.0); // More concentrated on the edges
 
-    // 3. Iridescence (Oil Film Color)
-    // d * 4.0 creates rings; fresnel shifts them at angles
-    vec3 rainbow = palette(d * 4.0 + fresnel * 0.8);
+    // 4. Iridescence (Oil Film Color)
+    // Reduced ring pattern multiplier from 4.0 to 1.5
+    vec3 rainbow = palette(d * 1.5 + fresnel * 0.5);
 
-    // 4. Composition
+    // 5. Composition
     vec3 bg = vec3(1.0);
 
-    // Absorption: Darken the fluid body slightly to make it visible on white
-    // This represents the "thickness" of the oil
-    vec3 absorbed = bg - vec3(0.12) * d;
+    // Removed absorption to eliminate the shadow effect
+    vec3 absorbed = bg;
 
-    // Interference Visibility
-    // We want the rainbow to show primarily at edges (fresnel) but also slightly in the body
-    float interferenceStrength = fresnel * 1.5 + d * 0.2;
+    // Subtler interference strength
+    float interferenceStrength = fresnel * 0.5 + d * 0.1;
     interferenceStrength = clamp(interferenceStrength, 0.0, 1.0);
 
-    // Mix absorption and interference
-    vec3 fluidColor = mix(absorbed, rainbow, interferenceStrength * 0.8);
+    // Mix with a lower factor to make it more subtle
+    vec3 fluidColor = mix(absorbed, rainbow, interferenceStrength * 0.5);
     
-    // Final fade out to white background
     gl_FragColor = vec4(mix(bg, fluidColor, shape), 1.0);
   }
 `;
 
 // --- COMPONENT ---
 
-const IridescentFluid = () => {
+const IridescentFluid: React.FC<IridescentFluidProps> = ({ config, clearTrigger }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const simRefs = useRef<any>({});
+  const configRef = useRef(config);
+
+  useEffect(() => {
+    configRef.current = config;
+  }, [config]);
+
+  useEffect(() => {
+    if (clearTrigger > 0 && simRefs.current.renderer) {
+      const { renderer, velocity, density } = simRefs.current;
+      renderer.setRenderTarget(velocity.read);
+      renderer.clear();
+      renderer.setRenderTarget(velocity.write);
+      renderer.clear();
+      renderer.setRenderTarget(density.read);
+      renderer.clear();
+      renderer.setRenderTarget(density.write);
+      renderer.clear();
+      renderer.setRenderTarget(null);
+    }
+  }, [clearTrigger]);
 
   useEffect(() => {
     if (!containerRef.current || !canvasRef.current) return;
 
-    // --- SETUP ---
     const simRes = 256; 
     const dyeRes = 1024; 
     
@@ -187,64 +212,34 @@ const IridescentFluid = () => {
     const scene = new THREE.Scene();
     const plane = new THREE.PlaneGeometry(2, 2);
     
-    // --- FBO HELPERS ---
-    
     const type = /(iPad|iPhone|iPod)/g.test(navigator.userAgent) ? THREE.HalfFloatType : THREE.FloatType;
 
-    const createFBO = (res: number) => {
-        return new THREE.WebGLRenderTarget(res, res, {
-            type: type,
-            format: THREE.RGBAFormat,
-            minFilter: THREE.LinearFilter,
-            magFilter: THREE.LinearFilter,
-            wrapS: THREE.ClampToEdgeWrapping,
-            wrapT: THREE.ClampToEdgeWrapping,
-        });
-    };
+    const createFBO = (res: number) => new THREE.WebGLRenderTarget(res, res, {
+        type, format: THREE.RGBAFormat, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
+        wrapS: THREE.ClampToEdgeWrapping, wrapT: THREE.ClampToEdgeWrapping,
+    });
 
-    const createDoubleFBO = (res: number) => {
-        return {
-            read: createFBO(res),
-            write: createFBO(res),
-            swap: function() {
-                const temp = this.read;
-                this.read = this.write;
-                this.write = temp;
-            }
-        };
-    };
+    const createDoubleFBO = (res: number) => ({
+        read: createFBO(res), write: createFBO(res),
+        swap: function() { [this.read, this.write] = [this.write, this.read]; }
+    });
 
     let velocity = createDoubleFBO(simRes);
     let density = createDoubleFBO(dyeRes);
     let divergence = createFBO(simRes);
     let pressure = createDoubleFBO(simRes);
 
-    // --- MATERIALS ---
-
-    const createShaderMaterial = (fragmentShader: string) => {
-        return new THREE.ShaderMaterial({
-            uniforms: {
-                uVelocity: { value: null },
-                uSource: { value: null },
-                uTarget: { value: null },
-                uPressure: { value: null },
-                uDivergence: { value: null },
-                uDensity: { value: null },
-                texelSize: { value: new THREE.Vector2() },
-                dt: { value: 0.016 },
-                dissipation: { value: 0.98 },
-                aspectRatio: { value: 1.0 },
-                color: { value: new THREE.Vector3() },
-                point: { value: new THREE.Vector2() },
-                radius: { value: 0.0 },
-            },
-            vertexShader: BASE_VERTEX,
-            fragmentShader: fragmentShader,
-            depthWrite: false,
-            depthTest: false,
-            blending: THREE.NoBlending
-        });
-    };
+    const createShaderMaterial = (fs: string) => new THREE.ShaderMaterial({
+        uniforms: {
+            uVelocity: { value: null }, uSource: { value: null }, uTarget: { value: null },
+            uPressure: { value: null }, uDivergence: { value: null }, uDensity: { value: null },
+            texelSize: { value: new THREE.Vector2() }, dt: { value: 0.016 }, dissipation: { value: 0.98 },
+            aspectRatio: { value: 1.0 }, color: { value: new THREE.Vector3() },
+            point: { value: new THREE.Vector2() }, radius: { value: 0.0 },
+        },
+        vertexShader: BASE_VERTEX, fragmentShader: fs,
+        depthWrite: false, depthTest: false, blending: THREE.NoBlending
+    });
 
     const splatMat = createShaderMaterial(SPLAT_SHADER);
     const advectionMat = createShaderMaterial(ADVECTION_SHADER);
@@ -255,8 +250,8 @@ const IridescentFluid = () => {
 
     const quad = new THREE.Mesh(plane, displayMat);
     scene.add(quad);
-
-    // --- INTERACTION STATE ---
+    
+    simRefs.current = { renderer, velocity, density };
 
     const pointer = { x: 0, y: 0, dx: 0, dy: 0, moved: false, down: false };
     
@@ -264,7 +259,6 @@ const IridescentFluid = () => {
         const rect = canvasRef.current!.getBoundingClientRect();
         const nx = (x - rect.left) / rect.width;
         const ny = 1.0 - (y - rect.top) / rect.height; 
-        
         pointer.dx = nx - pointer.x;
         pointer.dy = ny - pointer.y;
         pointer.x = nx;
@@ -272,98 +266,72 @@ const IridescentFluid = () => {
         pointer.moved = true;
     };
 
-    const onMouseMove = (e: MouseEvent) => {
-        updatePointer(e.clientX, e.clientY);
-    };
-    
-    const onTouchMove = (e: TouchEvent) => {
-        updatePointer(e.touches[0].clientX, e.touches[0].clientY);
-    };
-
-    const onMouseDown = () => { pointer.down = true; };
-    const onMouseUp = () => { pointer.down = false; };
-
+    const onMouseMove = (e: MouseEvent) => updatePointer(e.clientX, e.clientY);
+    const onTouchMove = (e: TouchEvent) => { e.preventDefault(); updatePointer(e.touches[0].clientX, e.touches[0].clientY); };
     window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mousedown', onMouseDown);
-    window.addEventListener('mouseup', onMouseUp);
     canvasRef.current.addEventListener('touchmove', onTouchMove, { passive: false });
-
-    // --- SIMULATION LOOP ---
 
     const blit = (target: THREE.WebGLRenderTarget | null) => {
         renderer.setRenderTarget(target);
         renderer.render(scene, camera);
-        renderer.setRenderTarget(null);
     };
 
-    const splat = (target: any, color: THREE.Vector3, point: THREE.Vector2) => {
+    const splat = (target: any, color: THREE.Vector3, point: THREE.Vector2, radius: number) => {
         quad.material = splatMat;
         splatMat.uniforms.uTarget.value = target.read.texture;
         splatMat.uniforms.aspectRatio.value = canvasRef.current!.width / canvasRef.current!.height;
         splatMat.uniforms.point.value.copy(point);
         splatMat.uniforms.color.value.copy(color);
-        splatMat.uniforms.radius.value = 0.003; 
+        splatMat.uniforms.radius.value = radius;
         blit(target.write);
         target.swap();
     };
 
     let lastTime = Date.now();
+    let animationFrameId: number;
 
     const animate = () => {
         const now = Date.now();
         const dt = Math.min((now - lastTime) / 1000, 0.032);
         lastTime = now;
+        const currentConfig = configRef.current;
 
-        // 1. SPLAT (Input)
         if (pointer.moved) {
-            // Velocity Splat
-            const vStrength = 25.0; 
-            splat(velocity, new THREE.Vector3(pointer.dx * vStrength, pointer.dy * vStrength, 0.0), new THREE.Vector2(pointer.x, pointer.y));
-            
-            // Density Splat
-            splat(density, new THREE.Vector3(1.0, 0.0, 0.0), new THREE.Vector2(pointer.x, pointer.y));
-            
+            const vStrength = currentConfig.splatStrength;
+            splat(velocity, new THREE.Vector3(pointer.dx * vStrength, pointer.dy * vStrength, 0.0), new THREE.Vector2(pointer.x, pointer.y), currentConfig.splatRadius);
+            splat(density, new THREE.Vector3(1.0, 0.0, 0.0), new THREE.Vector2(pointer.x, pointer.y), currentConfig.splatRadius);
             pointer.moved = false;
         }
 
-        // 2. ADVECTION
         quad.material = advectionMat;
         advectionMat.uniforms.dt.value = dt;
-        
-        // Velocity (Flow)
-        advectionMat.uniforms.dissipation.value = 0.995; 
+        advectionMat.uniforms.dissipation.value = currentConfig.velocityDissipation;
         advectionMat.uniforms.uVelocity.value = velocity.read.texture;
         advectionMat.uniforms.uSource.value = velocity.read.texture;
         advectionMat.uniforms.texelSize.value.set(1.0 / simRes, 1.0 / simRes);
         blit(velocity.write);
         velocity.swap();
 
-        // Density (Fade)
-        advectionMat.uniforms.dissipation.value = 0.992; 
-        advectionMat.uniforms.uVelocity.value = velocity.read.texture;
+        advectionMat.uniforms.dissipation.value = currentConfig.densityDissipation;
         advectionMat.uniforms.uSource.value = density.read.texture;
         advectionMat.uniforms.texelSize.value.set(1.0 / dyeRes, 1.0 / dyeRes);
         blit(density.write);
         density.swap();
 
-        // 3. DIVERGENCE
         quad.material = divergenceMat;
         divergenceMat.uniforms.uVelocity.value = velocity.read.texture;
         divergenceMat.uniforms.texelSize.value.set(1.0 / simRes, 1.0 / simRes);
         blit(divergence);
 
-        // 4. PRESSURE (Jacobi)
         quad.material = pressureMat;
         pressureMat.uniforms.uDivergence.value = divergence.texture;
         pressureMat.uniforms.texelSize.value.set(1.0 / simRes, 1.0 / simRes);
-        
-        for (let i = 0; i < 20; i++) {
+        for (let i = 0; i < currentConfig.pressureIterations; i++) {
             pressureMat.uniforms.uPressure.value = pressure.read.texture;
             blit(pressure.write);
             pressure.swap();
         }
 
-        // 5. GRADIENT SUBTRACT
         quad.material = gradientSubtractMat;
         gradientSubtractMat.uniforms.uPressure.value = pressure.read.texture;
         gradientSubtractMat.uniforms.uVelocity.value = velocity.read.texture;
@@ -371,7 +339,6 @@ const IridescentFluid = () => {
         blit(velocity.write);
         velocity.swap();
 
-        // 6. RENDER DISPLAY
         renderer.setRenderTarget(null);
         quad.material = displayMat;
         displayMat.uniforms.uDensity.value = density.read.texture;
@@ -379,32 +346,26 @@ const IridescentFluid = () => {
         displayMat.uniforms.texelSize.value.set(1.0 / dyeRes, 1.0 / dyeRes);
         renderer.render(scene, camera);
 
-        requestAnimationFrame(animate);
+        animationFrameId = requestAnimationFrame(animate);
     };
 
     animate();
 
     const handleResize = () => {
         if (!containerRef.current || !canvasRef.current) return;
-        const width = containerRef.current.clientWidth;
-        const height = containerRef.current.clientHeight;
-        
-        canvasRef.current.width = width;
-        canvasRef.current.height = height;
-        renderer.setSize(width, height);
+        renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight, false);
     };
 
     handleResize();
     window.addEventListener('resize', handleResize);
 
     return () => {
+        cancelAnimationFrame(animationFrameId);
         window.removeEventListener('mousemove', onMouseMove);
-        window.removeEventListener('mousedown', onMouseDown);
-        window.removeEventListener('mouseup', onMouseUp);
         window.removeEventListener('resize', handleResize);
         if (canvasRef.current) {
-             // eslint-disable-next-line react-hooks/exhaustive-deps
-             canvasRef.current.removeEventListener('touchmove', onTouchMove);
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+            canvasRef.current.removeEventListener('touchmove', onTouchMove);
         }
         renderer.dispose();
     };

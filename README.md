@@ -2,27 +2,28 @@
 
 [**Remix on AI Studio**](https://ai.studio/apps/drive/1WYqqbd5DDER7bue4-jyHmwA6AC6Fn65w?fullscreenApplet=true)
 
-This is a starter project for building modern, theme-aware React applications. It's set up with a modular structure, a powerful design system, and is ready for you to integrate the Gemini API.
+This is a starter project for building modern, theme-aware React applications. It's set up with a modular structure, a powerful design system, and a configurable, interactive fluid simulation powered by Three.js.
 
 ## Project Scan Sheet
 
 | Category | Details |
 | :--- | :--- |
 | **Framework** | React 18.2.0 (ESM via `importmap`) |
+| **Rendering** | Three.js (WebGL) for core visual experience |
 | **Styling** | CSS-in-JS (JS Objects), Semantic Design Tokens, No CSS Modules/Tailwind |
-| **Animation** | Framer Motion 12.x (Spring Physics, Layout Animations) |
+| **Animation** | Framer Motion 12.x (for UI), shaders (for simulation) |
 | **Typography** | Bebas Neue (Display), Comic Neue (Quotes), Inter (UI), Victor Mono (Code) |
 | **Icons** | Phosphor Icons (Web Component) |
 | **State Management** | React Context (`Theme`, `Breakpoint`), Local State, History Stack (Undo/Redo) |
 | **Architecture** | Atomic-based: `Core` → `Package` → `Section` → `Page` → `App` |
-| **Key Components** | Floating Windows, Draggable Dock, State Layer (Ripple), Element Anatomy Inspector |
+| **Key Components** | Floating Windows, Draggable Dock, State Layer (Ripple), Fluid Simulation Controls |
 | **Theme System** | Light/Dark Modes, Responsive Tokens, Feedback States (Success, Warning, Error, Signal) |
-| **Inputs** | Range Sliders, Color Pickers, Toggles, Selects, TextAreas |
-| **Visuals** | Confetti System, Blueprint Overlays, Token Badges, Glassmorphism |
+| **Inputs** | Range Sliders, Toggles, Selects, TextAreas |
+| **Visuals** | Interactive Iridescent Fluid Simulation |
 
 ## What's Inside? (ELI10 Version)
 
-Imagine you're building with LEGOs. This project gives you a super organized box of special LEGO pieces to build an amazing app.
+Imagine you're playing with a magical, colorful liquid on your screen. This project gives you a control panel to change how that liquid behaves.
 
 -   **`index.html`**: The front door to our app.
 -   **`index.tsx`**: The main brain of the app.
@@ -30,11 +31,10 @@ Imagine you're building with LEGOs. This project gives you a super organized box
 -   **`Theme.tsx`**: The "master closet" for our app's style (colors, fonts, etc.).
 -   **`hooks/`**: Special tools (custom hooks).
     -   `useBreakpoint.tsx`: Checks if you're on a phone, tablet, or desktop.
-    -   `useElementAnatomy.tsx`: A special ruler that precisely measures a component and its inner parts.
 -   **`types/`**: A dictionary for our app's data shapes.
     -   `index.tsx`: Defines what a "Window" or a "Log Entry" looks like.
--   **`components/`**: The LEGO pieces themselves, organized by complexity!
-    -   **`Core/`**: The most basic, single-purpose pieces (Button, Input, Toggle, etc.).
+-   **`components/`**: The building blocks, organized by complexity!
+    -   **`Core/`**: The most basic pieces (`IridescentFluid`, `RangeSlider`, `Toggle`).
     -   **`Package/`**: Combines Core pieces into something more useful (`ControlPanel`, `FloatingWindow`).
     -   **`Section/`**: A whole section of the app (the `Dock` at the bottom, the main `Stage`).
     -   **`Page/`**: A full screen you see (`Welcome` page).
@@ -57,8 +57,10 @@ Imagine you're building with LEGOs. This project gives you a super organized box
 │   │   ├── Confetti.tsx
 │   │   ├── DockIcon.tsx
 │   │   ├── Input.tsx
+│   │   ├── IridescentFluid.tsx
 │   │   ├── LogEntry.tsx
 │   │   ├── RangeSlider.tsx
+│   │   ├── RippleLayer.tsx
 │   │   ├── Select.tsx
 │   │   ├── StateLayer.tsx
 │   │   ├── TextArea.tsx
@@ -76,8 +78,7 @@ Imagine you're building with LEGOs. This project gives you a super organized box
 │       ├── Dock.tsx
 │       └── Stage.tsx
 ├── hooks/
-│   ├── useBreakpoint.tsx
-│   └── useElementAnatomy.tsx
+│   └── useBreakpoint.tsx
 ├── types/
 │   └── index.tsx
 ├── README.md
@@ -95,4 +96,4 @@ Imagine you're building with LEGOs. This project gives you a super organized box
 
 1.  Open the `index.html` file in a modern web browser.
 2.  That's it! The app will run.
-3.  Start changing the code in the `.tsx` files to build your own features.
+3.  Use the dock icons to open the control panels and experiment with the fluid simulation.
