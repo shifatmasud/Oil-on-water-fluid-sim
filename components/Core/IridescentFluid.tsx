@@ -5,6 +5,7 @@
 import React, { useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import { FluidProps } from '../../types/index.tsx';
+import { useTheme } from '../../Theme.tsx';
 
 interface IridescentFluidProps {
     config: FluidProps;
@@ -118,9 +119,13 @@ const DISPLAY_SHADER = `
   uniform sampler2D uImage;
   uniform vec2 texelSize;
   uniform float uAspectRatio;
+  uniform vec3 uBackgroundColor;
+  uniform bool uIsDarkMode;
 
   vec3 palette( in float t ) {
-      return vec3(0.8) + vec3(0.2) * cos( 6.28318 * (vec3(1.0) * t + vec3(0.00, 0.33, 0.67)) );
+      vec3 base = uIsDarkMode ? vec3(0.5) : vec3(0.8);
+      vec3 amp = uIsDarkMode ? vec3(0.18) : vec3(0.2);
+      return base + amp * cos( 6.28318 * (vec3(1.0) * t + vec3(0.00, 0.33, 0.67)) );
   }
 
   void main() {
@@ -154,7 +159,7 @@ const DISPLAY_SHADER = `
         
         baseColor = (s0 + s1 + s2 + s3 + s4) * 0.2;
     } else {
-        baseColor = vec3(1.0); // Pure White Plane
+        baseColor = uBackgroundColor;
     }
 
     // 4. Fluid Visuals (Oil iridescence overlay)
@@ -184,6 +189,7 @@ const IridescentFluid: React.FC<IridescentFluidProps> = ({ config, clearTrigger,
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const simRefs = useRef<any>({});
   const configRef = useRef(config);
+  const { theme, themeName } = useTheme();
 
   useEffect(() => {
     configRef.current = config;
@@ -205,6 +211,15 @@ const IridescentFluid: React.FC<IridescentFluidProps> = ({ config, clearTrigger,
   }, [clearTrigger]);
 
   useEffect(() => {
+    const { renderer, displayMat } = simRefs.current;
+    if (renderer && displayMat) {
+      renderer.setClearColor(theme.Color.Base.Surface[1], 1);
+      displayMat.uniforms.uBackgroundColor.value.set(theme.Color.Base.Surface[1]);
+      displayMat.uniforms.uIsDarkMode.value = themeName === 'dark';
+    }
+  }, [theme, themeName]);
+
+  useEffect(() => {
     if (!containerRef.current || !canvasRef.current) return;
 
     const simRes = 256; 
@@ -216,7 +231,6 @@ const IridescentFluid: React.FC<IridescentFluidProps> = ({ config, clearTrigger,
         antialias: false,
         powerPreference: 'high-performance'
     });
-    renderer.setClearColor(0xffffff, 1);
     
     const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     const scene = new THREE.Scene();
@@ -247,6 +261,8 @@ const IridescentFluid: React.FC<IridescentFluidProps> = ({ config, clearTrigger,
             texelSize: { value: new THREE.Vector2() }, dt: { value: 0.016 }, dissipation: { value: 0.98 },
             aspectRatio: { value: 1.0 }, color: { value: new THREE.Vector3() },
             point: { value: new THREE.Vector2() }, radius: { value: 0.0 },
+            uBackgroundColor: { value: new THREE.Color() },
+            uIsDarkMode: { value: false },
             uAspectRatio: { value: 1.0 }
         },
         vertexShader: BASE_VERTEX, fragmentShader: fs,
@@ -277,7 +293,12 @@ const IridescentFluid: React.FC<IridescentFluidProps> = ({ config, clearTrigger,
     const quad = new THREE.Mesh(plane, displayMat);
     scene.add(quad);
     
-    simRefs.current = { renderer, velocity, density };
+    simRefs.current = { renderer, velocity, density, displayMat };
+
+    // Initial theme setup
+    renderer.setClearColor(theme.Color.Base.Surface[1], 1);
+    displayMat.uniforms.uBackgroundColor.value.set(theme.Color.Base.Surface[1]);
+    displayMat.uniforms.uIsDarkMode.value = themeName === 'dark';
 
     const pointer = { x: 0, y: 0, dx: 0, dy: 0, moved: false, down: false };
     
@@ -410,7 +431,7 @@ const IridescentFluid: React.FC<IridescentFluidProps> = ({ config, clearTrigger,
           pointerEvents: 'none',
           fontFamily: '"Inter", sans-serif',
           fontSize: '12px',
-          color: '#aaa',
+          color: theme.Color.Base.Content[3],
           letterSpacing: '0.05em',
           textTransform: 'uppercase'
       }}>
