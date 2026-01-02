@@ -4,7 +4,7 @@
  */
 import React from 'react';
 import { useTheme } from '../../Theme.tsx';
-import { LogEntry as LogEntryType } from '../../types/index.tsx';
+import { LogEntry as LogEntryType } from '../../types.tsx';
 
 interface LogEntryProps {
   log: LogEntryType;

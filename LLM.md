@@ -9,8 +9,8 @@ Hello! You are an AI assistant helping to build this React application. Here are
 -   `importmap.js`
 -   `metadata.json`
 -   `Theme.tsx`
+-   `types.tsx`
 -   `hooks/useBreakpoint.tsx`
--   `types/index.tsx`
 -   `components/App/MetaPrototype.tsx`
 -   `components/Core/Button.tsx`
 -   `components/Core/ColorPicker.tsx`

@@ -29,10 +29,9 @@ Imagine you're playing with a magical, colorful liquid on your screen. This proj
 -   **`index.tsx`**: The main brain of the app.
 -   **`importmap.js`**: A map that tells our app where to find its tools (like React).
 -   **`Theme.tsx`**: The "master closet" for our app's style (colors, fonts, etc.).
+-   **`types.tsx`**: A central file for all TypeScript type definitions, like what a "Window" or "Log Entry" looks like.
 -   **`hooks/`**: Special tools (custom hooks).
     -   `useBreakpoint.tsx`: Checks if you're on a phone, tablet, or desktop.
--   **`types/`**: A dictionary for our app's data shapes.
-    -   `index.tsx`: Defines what a "Window" or a "Log Entry" looks like.
 -   **`components/`**: The building blocks, organized by complexity!
     -   **`Core/`**: The most basic pieces (`IridescentFluid`, `RangeSlider`, `Toggle`).
     -   **`Package/`**: Combines Core pieces into something more useful (`ControlPanel`, `FloatingWindow`).
@@ -79,13 +78,12 @@ Imagine you're playing with a magical, colorful liquid on your screen. This proj
 │       └── Stage.tsx
 ├── hooks/
 │   └── useBreakpoint.tsx
-├── types/
-│   └── index.tsx
 ├── README.md
 ├── LLM.md
 ├── noteBook.md
 ├── bugReport.md
 ├── Theme.tsx
+├── types.tsx
 ├── importmap.js
 ├── index.html
 ├── index.tsx

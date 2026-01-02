@@ -4,7 +4,7 @@
  */
 import React, { useRef, useEffect } from 'react';
 import * as THREE from 'three';
-import { FluidProps } from '../../types/index.tsx';
+import { FluidProps } from '../../types.tsx';
 import { useTheme } from '../../Theme.tsx';
 
 interface IridescentFluidProps {

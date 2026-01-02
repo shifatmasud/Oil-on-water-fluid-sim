@@ -4,7 +4,7 @@
  */
 import React from 'react';
 import { useTheme } from '../../Theme.tsx';
-import { FluidProps } from '../../types/index.tsx';
+import { FluidProps } from '../../types.tsx';
 import IridescentFluid from '../Core/IridescentFluid.tsx';
 
 interface StageProps {

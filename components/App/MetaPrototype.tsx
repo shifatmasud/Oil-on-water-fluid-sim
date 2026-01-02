@@ -13,7 +13,7 @@ import ControlPanel from '../Package/ControlPanel.tsx';
 import CodePanel from '../Package/CodePanel.tsx';
 import ConsolePanel from '../Package/ConsolePanel.tsx';
 import UndoRedo from '../Package/UndoRedo.tsx';
-import { WindowId, WindowState, LogEntry, FluidProps } from '../../types/index.tsx';
+import { WindowId, WindowState, LogEntry, FluidProps } from '../../types.tsx';
 
 /**
  * 🏎️ Meta Prototype App

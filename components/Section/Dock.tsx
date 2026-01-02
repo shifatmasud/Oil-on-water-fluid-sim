@@ -6,7 +6,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { useTheme } from '../../Theme.tsx';
 import DockIcon from '../Core/DockIcon.tsx';
-import { WindowId, WindowState } from '../../types/index.tsx';
+import { WindowId, WindowState } from '../../types.tsx';
 
 interface DockProps {
     windows: Record<WindowId, WindowState>;

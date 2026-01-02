@@ -6,7 +6,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { useTheme } from '../../Theme.tsx';
 import TextArea from '../Core/TextArea.tsx';
-import { FluidProps } from '../../types/index.tsx';
+import { FluidProps } from '../../types.tsx';
 
 interface CodePanelProps {
   codeText: string;
